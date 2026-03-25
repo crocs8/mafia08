@@ -61,6 +61,9 @@ export default function GamePage() {
         }
         return updatedRoom;
       });
+      if (updatedRoom.messages) {
+        setMessages(updatedRoom.messages);
+      }
 
       if (updatedRoom.status === 'night') {
         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(100);
