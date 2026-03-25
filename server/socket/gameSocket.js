@@ -51,15 +51,15 @@ async function startNightPhase(io, room) {
   await room.save();
   broadcastRoom(io, room);
 
-  // Auto-resolve night after discussionTime (night timer = 45s fixed)
-  const NIGHT_DURATION = 45000;
+  // Auto-resolve night after 60s
+  const NIGHT_DURATION = 60000;
   clearRoomTimer(room.code);
   roomTimers[room.code] = setTimeout(async () => {
     await resolveNight(io, room.code);
   }, NIGHT_DURATION);
 
   // Broadcast countdown
-  io.to(room.code).emit('phase:timer', { duration: 45, phase: 'night' });
+  io.to(room.code).emit('phase:timer', { duration: 60, phase: 'night' });
 }
 
 async function resolveNight(io, roomCode) {
@@ -163,7 +163,8 @@ async function resolveVote(io, roomCode) {
     const target = room.players.find(p => p.userId === eliminated);
     if (target) {
       target.isAlive = false;
-      systemMsg(room, `⚖️ ${target.username} got lynched after voting. They were ${target.role.toUpperCase()}.`, 'system', io);
+      const label = target.role === 'mafia' ? 'MAFIA' : 'INNOCENT';
+      systemMsg(room, `⚖️ ${target.username} got lynched. They were ${label}.`, 'system', io);
 
       if (target.loverId) {
         const otherLover = room.players.find(p => p.userId === target.loverId);
@@ -360,7 +361,7 @@ function registerSocketHandlers(io) {
 
         await room.save();
         socket.emit('night:action:confirm', { targetId });
-        broadcastRoom(io, room);
+        // Don't broadcastRoom here — it would vibrate others' phones revealing someone acted
 
         // Check if all night roles have acted → early resolve
         const aliveNightRoles = room.players.filter(p => p.isAlive && nightRoles.includes(p.role));
@@ -369,6 +370,35 @@ function registerSocketHandlers(io) {
           clearRoomTimer(room.code);
           setTimeout(() => resolveNight(io, room.code), 1500);
         }
+      } catch (e) {
+        socket.emit('error', e.message);
+      }
+    });
+
+    // Discussion time vote (+/- 10s, once per day per player)
+    socket.on('discussion:vote', async ({ roomCode, delta }) => {
+      try {
+        if (delta !== 10 && delta !== -10) return socket.emit('error', 'Invalid delta');
+        const room = await Room.findOne({ code: roomCode.toUpperCase() });
+        if (!room || room.status !== 'day') return socket.emit('error', 'Not discussion phase');
+
+        const player = room.players.find(p => p.userId === socket.userId);
+        if (!player || !player.isAlive) return;
+
+        // Check if player already voted this round
+        if (!room.timeVotes) room.timeVotes = new Map();
+        if (room.timeVotes.get(socket.userId) === room.round) {
+          return socket.emit('error', 'Already adjusted time this day');
+        }
+
+        // Apply delta (clamp between 30s and 300s)
+        room.discussionTime = Math.min(300, Math.max(30, room.discussionTime + delta));
+        room.timeVotes.set(socket.userId, room.round);
+
+        await room.save();
+        const action = delta > 0 ? 'added +10s' : 'removed -10s';
+        systemMsg(room, `⏱️ ${socket.username} ${action} to discussion time. (Now ${room.discussionTime}s)`, 'system', io);
+        broadcastRoom(io, room);
       } catch (e) {
         socket.emit('error', e.message);
       }

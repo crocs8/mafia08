@@ -33,6 +33,7 @@ export default function GamePage() {
   const [totalVoters, setTotalVoters] = useState(0);
   const [myVote, setMyVote] = useState(null);
   const [nightActionConfirmed, setNightActionConfirmed] = useState(false);
+  const [hasVotedTimer, setHasVotedTimer] = useState(null); // tracks round they voted
   const socketReady = useRef(false);
   const initialMessageSynced = useRef(false);
 
@@ -95,6 +96,7 @@ export default function GamePage() {
 
     socket.on('night:action:confirm', () => {
       setNightActionConfirmed(true);
+      // No vibration — would reveal who acted to others
     });
 
     socket.on('error', (msg) => {
@@ -182,7 +184,13 @@ export default function GamePage() {
     const socket = getSocket();
     socket?.emit('vote:cast', { roomCode: code, targetId });
     setMyVote(targetId);
-    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
+  };
+
+  const handleTimeVote = (delta) => {
+    if (hasVotedTimer === room?.round) return; // already voted this day
+    const socket = getSocket();
+    socket?.emit('discussion:vote', { roomCode: code, delta });
+    setHasVotedTimer(room?.round);
   };
 
   if (loading) return <Loader />;
@@ -233,7 +241,26 @@ export default function GamePage() {
             </span>
           </div>
         </div>
-        <PhaseTimer timeLeft={timeLeft} phase={timerPhase} />
+        <div style={{ display:'flex', alignItems:'center', gap:'0.5rem' }}>
+          {isDay && isAlive && (
+            <>
+              <button
+                title={hasVotedTimer === room.round ? 'Already voted today' : '-10s'}
+                style={{ ...styles.timerBtn, opacity: hasVotedTimer === room.round ? 0.35 : 1 }}
+                onClick={() => handleTimeVote(-10)}
+                disabled={hasVotedTimer === room.round}
+              >−</button>
+              <PhaseTimer timeLeft={timeLeft} phase={timerPhase} />
+              <button
+                title={hasVotedTimer === room.round ? 'Already voted today' : '+10s'}
+                style={{ ...styles.timerBtn, opacity: hasVotedTimer === room.round ? 0.35 : 1 }}
+                onClick={() => handleTimeVote(10)}
+                disabled={hasVotedTimer === room.round}
+              >+</button>
+            </>
+          )}
+          {!isDay && <PhaseTimer timeLeft={timeLeft} phase={timerPhase} />}
+        </div>
         <div style={styles.topRight}>
           {roleInfo && (
             <span style={{ fontFamily:'var(--font-display)', fontSize:'0.75rem', letterSpacing:'0.08em', color: roleInfo.color }}>
@@ -258,6 +285,7 @@ export default function GamePage() {
               myUserId={user?.userId}
               showRoles={room.status === 'ended'}
             />
+            <button style={styles.leaveBtn} onClick={handleLeave}>🚪 Leave Room</button>
           </aside>
         )}
 
@@ -388,6 +416,8 @@ const styles = {
   phaseDot: { width:8, height:8, borderRadius:'50%' },
   topRight: { display:'flex', alignItems:'center', gap:'0.75rem' },
   deadTag: { fontFamily:'var(--font-display)', fontSize:'0.65rem', letterSpacing:'0.1em', color:'var(--red)', border:'1px solid var(--red-dim)', padding:'1px 6px', borderRadius:'2px' },
+  timerBtn: { width:24, height:24, background:'var(--bg-card2)', border:'1px solid var(--border)', borderRadius:'4px', color:'var(--text-secondary)', fontSize:'1rem', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, lineHeight:1 },
+  leaveBtn: { margin:'auto 0.5rem 0.5rem', background:'rgba(220,38,38,0.08)', border:'1px solid var(--red-dim)', color:'var(--red)', fontSize:'0.75rem', fontFamily:'var(--font-body)', padding:'0.4rem 0.5rem', borderRadius:'var(--radius)', cursor:'pointer', textAlign:'left' },
   errorBanner: { background:'var(--red-dim)', color:'var(--red-bright)', padding:'0.375rem 1rem', fontSize:'0.8rem', fontFamily:'var(--font-mono)', textAlign:'center', flexShrink:0 },
   main: { flex:1, display:'flex', overflow:'hidden', minHeight:0 },
   sidebar: {

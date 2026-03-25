@@ -20,7 +20,7 @@ export default function PlayerList({ players, myUserId, showRoles }) {
         <>
           <div style={styles.deadHeader}>ELIMINATED</div>
           <div style={styles.list}>
-            {dead.map(p => <PlayerRow key={p.userId} player={p} isMe={p.userId === myUserId} showRole dead />)}
+            {dead.map(p => <PlayerRow key={p.userId} player={p} isMe={p.userId === myUserId} showRole={showRoles} dead />)}
           </div>
         </>
       )}
@@ -30,6 +30,9 @@ export default function PlayerList({ players, myUserId, showRoles }) {
 
 function PlayerRow({ player, isMe, showRole, dead }) {
   const roleInfo = player.role && player.role !== '?' ? ROLE_INFO[player.role] : null;
+  const isMafia = player.role === 'mafia';
+  // For dead players: show innocent/mafia only
+  const deadLabel = dead ? (isMafia ? { label: 'MAFIA', color: 'var(--red)', icon: '🔴' } : { label: 'INNOCENT', color: '#22c55e', icon: '💚' }) : null;
 
   return (
     <div style={{ ...styles.row, opacity: dead ? 0.5 : 1 }}>
@@ -47,7 +50,12 @@ function PlayerRow({ player, isMe, showRole, dead }) {
           {isMe && <span style={styles.meTag}>YOU</span>}
         </span>
       </div>
-      {(showRole || dead) && roleInfo && (
+      {dead && deadLabel && (
+        <span style={{ fontSize:'0.7rem', color: deadLabel.color, fontFamily:'var(--font-display)', letterSpacing:'0.06em' }}>
+          {deadLabel.icon} {deadLabel.label}
+        </span>
+      )}
+      {showRole && !dead && roleInfo && (
         <span style={{ fontSize:'0.7rem', color: roleInfo.color, fontFamily:'var(--font-display)', letterSpacing:'0.06em' }}>
           {roleInfo.icon} {roleInfo.label}
         </span>

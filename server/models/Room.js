@@ -52,6 +52,7 @@ const roomSchema = new mongoose.Schema({
   // Reporter expose queue (announced next morning)
   pendingNewsExpose: { type: String, default: null },
   winner: { type: String, default: null }, // 'mafia' | 'town'
+  timeVotes: { type: Map, of: Number, default: {} }, // userId -> round number they voted
   createdAt: { type: Date, default: Date.now, expires: 7200 } // auto-delete after 2h
 });
 
