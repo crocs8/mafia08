@@ -34,6 +34,7 @@ export default function GamePage() {
   const [myVote, setMyVote] = useState(null);
   const [nightActionConfirmed, setNightActionConfirmed] = useState(false);
   const socketReady = useRef(false);
+  const initialMessageSynced = useRef(false);
 
   // Mobile layout states
   const [activeTab, setActiveTab] = useState('chat');
@@ -61,8 +62,9 @@ export default function GamePage() {
         }
         return updatedRoom;
       });
-      if (updatedRoom.messages) {
+      if (updatedRoom.messages && !initialMessageSynced.current) {
         setMessages(updatedRoom.messages);
+        initialMessageSynced.current = true;
       }
 
       if (updatedRoom.status === 'night') {

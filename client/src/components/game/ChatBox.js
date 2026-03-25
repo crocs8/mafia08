@@ -29,7 +29,9 @@ export default function ChatBox({ messages, onSend, disabled, isNight, isMafia, 
       {/* Message list */}
       <div style={styles.messageList}>
         <AnimatePresence initial={false}>
-          {messages.map((msg, i) => (
+          {messages
+            .filter(msg => !(msg.type === 'mafia-chat' && !isMafia))
+            .map((msg, i) => (
             <motion.div
               key={i}
               initial={{ opacity:0, y:8 }}
@@ -44,7 +46,7 @@ export default function ChatBox({ messages, onSend, disabled, isNight, isMafia, 
       </div>
 
       {/* Input */}
-      <div style={styles.inputRow}>
+      <div style={{ ...styles.inputRow, position: 'sticky', bottom: 0 }}>
         <button style={styles.plusBtn} disabled={!canChat} title="Attachments coming soon">
           <span style={{ fontSize:'1.2rem', lineHeight:1 }}>+</span>
         </button>
@@ -95,15 +97,15 @@ function MessageBubble({ msg, myUsername }) {
   return (
     <div style={{
       ...styles.chatMsg,
-      borderLeft: isMine ? 'none' : '2px solid ' + (isMafiaChat ? 'var(--red-dim)' : 'var(--border)'),
-      borderRight: isMine ? '2px solid var(--border)' : 'none',
-      borderRightColor: isMine && isMafiaChat ? 'var(--red-dim)' : (isMine ? 'var(--border)' : 'transparent'),
+      borderLeft: isMine ? 'none' : '2px solid ' + (isMafiaChat ? '#dc2626' : 'var(--border)'),
+      borderRight: isMine ? '2px solid ' + (isMafiaChat ? '#dc2626' : 'var(--border)') : 'none',
       alignSelf: isMine ? 'flex-end' : 'flex-start',
       textAlign: isMine ? 'right' : 'left',
       marginLeft: isMine ? 'auto' : '0',
       display: 'flex',
       flexDirection: 'column',
-      alignItems: isMine ? 'flex-end' : 'flex-start'
+      alignItems: isMine ? 'flex-end' : 'flex-start',
+      background: isMafiaChat ? 'rgba(220,38,38,0.08)' : 'transparent',
     }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexDirection: isMine ? 'row-reverse' : 'row' }}>
         <span style={styles.chatUser}>{msg.username}</span>

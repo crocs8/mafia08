@@ -15,7 +15,23 @@ function shuffle(arr) {
 }
 
 function assignRoles(players, maxPlayers) {
-  const roles = shuffle(ROLE_CONFIGS[maxPlayers]);
+  const fullRoles = ROLE_CONFIGS[maxPlayers];
+  const count = players.length;
+
+  // Always include mafia roles first, then fill from the rest
+  const mafiaRoles = fullRoles.filter(r => r === 'mafia');
+  const otherRoles = fullRoles.filter(r => r !== 'mafia');
+
+  // Determine how many mafias: 1 for <=6, 2 for <=9, 3 for 12
+  const mafiaCount = count <= 6 ? 1 : count <= 9 ? 2 : 3;
+  const selectedMafia = mafiaRoles.slice(0, mafiaCount);
+
+  // Fill remaining slots with non-mafia roles (shuffled)
+  const shuffledOthers = shuffle(otherRoles);
+  const selectedOthers = shuffledOthers.slice(0, count - mafiaCount);
+
+  const roles = shuffle([...selectedMafia, ...selectedOthers]);
+
   const updated = players.map((p, i) => ({
     ...p.toObject ? p.toObject() : p,
     role: roles[i],

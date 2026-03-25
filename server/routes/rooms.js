@@ -65,7 +65,18 @@ router.get('/:code', auth, async (req, res) => {
   try {
     const room = await Room.findOne({ code: req.params.code.toUpperCase() });
     if (!room) return res.status(404).json({ error: 'Room not found' });
-    res.json(room);
+
+    // Find requesting player's role
+    const me = room.players.find(p => p.userId === req.user.userId);
+    const isMafia = me?.role === 'mafia';
+
+    // Strip mafia-chat messages from non-mafia players
+    const roomObj = room.toObject();
+    if (!isMafia) {
+      roomObj.messages = roomObj.messages.filter(m => m.type !== 'mafia-chat');
+    }
+
+    res.json(roomObj);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
