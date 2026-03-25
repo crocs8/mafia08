@@ -35,8 +35,10 @@ function broadcastRoom(io, room) {
   });
 }
 
-function systemMsg(room, text, type = 'system') {
-  room.messages.push({ userId: 'system', username: 'System', text, type });
+function systemMsg(room, text, type = 'system', io) {
+  const msg = { userId: 'system', username: 'System', text, type, timestamp: new Date() };
+  room.messages.push(msg);
+  if (io && room.code) io.to(room.code).emit('chat:message', msg);
 }
 
 async function startNightPhase(io, room) {
@@ -45,7 +47,7 @@ async function startNightPhase(io, room) {
   room.nightActions = [];
   room.players.forEach(p => { p.hasActed = false; });
 
-  systemMsg(room, `🌙 Night has begin. Role holders — make your moves. (Round ${room.round})`);
+  systemMsg(room, `🌙 Night has begin. Role holders — make your moves. (Round ${room.round})`, 'system', io);
   await room.save();
   broadcastRoom(io, room);
 
@@ -85,7 +87,7 @@ async function resolveNight(io, roomCode) {
   room.lastSaved = result.saved;
   room.pendingNewsExpose = result.newsExpose;
 
-  result.messages.forEach(m => systemMsg(room, m.text, m.type));
+  result.messages.forEach(m => systemMsg(room, m.text, m.type, io));
 
   // Check win
   const winner = checkWinCondition(room.players);
@@ -110,7 +112,7 @@ async function startDayPhase(io, room) {
   room.votes = new Map();
   room.round += 1;
 
-  systemMsg(room, `☀️ Day has begin. Discuss and find the mafia. (Round ${room.round})`);
+  systemMsg(room, `☀️ Day has begin. Discuss and find the mafia. (Round ${room.round})`, 'system', io);
   await room.save();
   broadcastRoom(io, room);
 
@@ -129,7 +131,7 @@ async function startVotingPhase(io, roomCode) {
 
   room.status = 'voting';
   room.votes = new Map();
-  systemMsg(room, '🗳️ Voting time! Vote to eliminate a suspect. 30 seconds.');
+  systemMsg(room, '🗳️ Voting time! Vote to eliminate a suspect. 30 seconds.', 'system', io);
   await room.save();
   broadcastRoom(io, room);
 
@@ -161,7 +163,7 @@ async function resolveVote(io, roomCode) {
     const target = room.players.find(p => p.userId === eliminated);
     if (target) {
       target.isAlive = false;
-      systemMsg(room, `⚖️ ${target.username} got lynched after voting. They were ${target.role.toUpperCase()}.`);
+      systemMsg(room, `⚖️ ${target.username} got lynched after voting. They were ${target.role.toUpperCase()}.`, 'system', io);
 
       if (target.loverId) {
         const otherLover = room.players.find(p => p.userId === target.loverId);
@@ -171,7 +173,7 @@ async function resolveVote(io, roomCode) {
       }
     }
   } else {
-    systemMsg(room, '🤷 No consensus — no one got lynched today.');
+    systemMsg(room, '🤷 No consensus — no one got lynched today.', 'system', io);
   }
 
   const winner = checkWinCondition(room.players);
@@ -229,7 +231,7 @@ function registerSocketHandlers(io) {
         }
 
         socket.join(roomCode.toUpperCase());
-        systemMsg(room, `${socket.username} joined the room.`);
+        systemMsg(room, `${socket.username} joined the room.`, 'system', io);
         await room.save();
 
         broadcastRoom(io, room);
@@ -279,7 +281,7 @@ function registerSocketHandlers(io) {
         room.status = 'playing';
         room.round = 1;
 
-        systemMsg(room, '🎮 Game started! Roles have been assigned. First night begins...');
+        systemMsg(room, '🎮 Game started! Roles have been assigned. First night begins...', 'system', io);
         await room.save();
         broadcastRoom(io, room);
 
