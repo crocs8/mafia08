@@ -51,7 +51,8 @@ export default function GamePage() {
 
     socketReady.current = true;
 
-    socket.emit('room:reconnect', { roomCode: code });
+    // --- Register ALL listeners FIRST before emitting any events ---
+    // This ensures no room:update event is missed due to a race condition.
 
     socket.on('room:update', (updatedRoom) => {
       setRoom(prev => {
@@ -96,13 +97,27 @@ export default function GamePage() {
 
     socket.on('night:action:confirm', () => {
       setNightActionConfirmed(true);
-      // No vibration — would reveal who acted to others
     });
 
     socket.on('error', (msg) => {
       setError(msg);
       setTimeout(() => setError(''), 3000);
     });
+
+    // After listeners are set up, reconcile room membership.
+    // room:reconnect updates our socketId and puts us in the socket room (if already a member).
+    // room:join is then called to handle the case where we are new OR to ensure
+    // the server sends the latest room:update to all existing players.
+    const doJoin = () => {
+      socket.emit('room:reconnect', { roomCode: code });
+      socket.emit('room:join', { roomCode: code });
+    };
+
+    if (socket.connected) {
+      doJoin();
+    } else {
+      socket.once('connect', doJoin);
+    }
   }, [code, connect, user?.userId, startTimer]);
 
   useEffect(() => {
@@ -139,24 +154,6 @@ export default function GamePage() {
       }
     };
   }, [code]);
-
-  const handleJoinSocket = useCallback(() => {
-    const socket = getSocket();
-    if (!socket) return;
-    socket.emit('room:join', { roomCode: code });
-  }, [code, getSocket]);
-
-  useEffect(() => {
-    if (room && !loading) {
-      const socket = getSocket();
-      if (socket?.connected) {
-        handleJoinSocket();
-      } else {
-        const s = connect();
-        s?.on('connect', handleJoinSocket);
-      }
-    }
-  }, [loading]);
 
   const handleStart = () => {
     const socket = getSocket();

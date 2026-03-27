@@ -28,6 +28,8 @@ function sanitizeRoom(room, requestingUserId) {
 }
 
 function broadcastRoom(io, room) {
+  // Emit a personalized (sanitized) room view to every player that has a socketId.
+  // Using individual socketId targeting ensures each player's role is hidden from others.
   room.players.forEach(p => {
     if (p.socketId) {
       io.to(p.socketId).emit('room:update', sanitizeRoom(room, p.userId));
@@ -216,13 +218,15 @@ function registerSocketHandlers(io) {
         const room = await Room.findOne({ code: roomCode.toUpperCase() });
         if (!room) return socket.emit('error', 'Room not found');
         if (room.status !== 'waiting') return socket.emit('error', 'Game already started');
-        if (room.players.length >= room.maxPlayers) return socket.emit('error', 'Room full');
 
         // Update or add player
         const existing = room.players.find(p => p.userId === socket.userId);
         if (existing) {
+          // Player already in room (e.g. host reconnecting) — just refresh socketId
           existing.socketId = socket.id;
         } else {
+          // New joiner — check capacity
+          if (room.players.length >= room.maxPlayers) return socket.emit('error', 'Room full');
           room.players.push({
             userId: socket.userId,
             username: socket.username,
@@ -231,32 +235,40 @@ function registerSocketHandlers(io) {
           });
         }
 
+        // IMPORTANT: join the socket room BEFORE broadcasting so this socket
+        // is already in the room channel when broadcastRoom runs.
         socket.join(roomCode.toUpperCase());
-        systemMsg(room, `${socket.username} joined the room.`, 'system', io);
+
+        if (!existing) {
+          // Only announce when it's a genuinely new player
+          systemMsg(room, `${socket.username} joined the room.`, 'system', io);
+        }
+
         await room.save();
 
+        // Broadcast updated room state to ALL players in the room (including host)
         broadcastRoom(io, room);
-        io.to(roomCode.toUpperCase()).emit('room:players', room.players.map(p => ({
-          userId: p.userId, username: p.username, isHost: p.isHost, isAlive: p.isAlive
-        })));
       } catch (e) {
         socket.emit('error', e.message);
       }
     });
 
-    // Reconnect (update socketId)
+    // Reconnect (update socketId for existing room member)
     socket.on('room:reconnect', async ({ roomCode }) => {
       try {
         const room = await Room.findOne({ code: roomCode.toUpperCase() });
         if (!room) return socket.emit('error', 'Room not found');
 
         const player = room.players.find(p => p.userId === socket.userId);
-        if (!player) return socket.emit('error', 'Not in room');
+        if (!player) return; // Not in this room — will be handled by room:join
 
         player.socketId = socket.id;
         await room.save();
 
+        // Join the socket.io room so future io.to(roomCode) broadcasts reach this socket
         socket.join(roomCode.toUpperCase());
+
+        // Send the current room state to only this reconnecting player
         socket.emit('room:update', sanitizeRoom(room, socket.userId));
       } catch (e) {
         socket.emit('error', e.message);
