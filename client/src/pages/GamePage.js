@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { usePhaseTimer } from '../hooks/usePhaseTimer';
+import { useGameAudio } from '../hooks/useGameAudio';
 import { ROLE_INFO } from '../assets/roleInfo';
 
 import WaitingRoom from '../components/lobby/WaitingRoom';
@@ -36,6 +37,9 @@ export default function GamePage() {
   const [hasVotedTimer, setHasVotedTimer] = useState(null); // tracks round they voted
   const socketReady = useRef(false);
   const initialMessageSynced = useRef(false);
+  const prevStatus = useRef(null); // tracks previous room.status for transition detection
+
+  const { playNightMusic, playDayNarration } = useGameAudio();
 
   // Mobile layout states
   const [activeTab, setActiveTab] = useState('chat');
@@ -69,17 +73,33 @@ export default function GamePage() {
         initialMessageSynced.current = true;
       }
 
-      if (updatedRoom.status === 'night') {
+      const newStatus = updatedRoom.status;
+      const oldStatus = prevStatus.current;
+
+      // ── Night phase starts ──
+      if (newStatus === 'night' && oldStatus !== 'night') {
         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(100);
         setNightActionConfirmed(false);
         setMyVote(null);
         setVoteCounts({});
+        playNightMusic();
       }
-      if (updatedRoom.status === 'day') {
+
+      // ── Day phase starts (night → day transition) ──
+      if (newStatus === 'day' && oldStatus === 'night') {
         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([100, 50, 100]);
         setMyVote(null);
         setVoteCounts({});
+        // lastKilled is an array on the room object — play gunshot if someone died
+        const hadKill = Array.isArray(updatedRoom.lastKilled) && updatedRoom.lastKilled.length > 0;
+        playDayNarration(hadKill);
+      } else if (newStatus === 'day' && oldStatus !== 'night') {
+        // day after voting round (no kill sound needed)
+        setMyVote(null);
+        setVoteCounts({});
       }
+
+      prevStatus.current = newStatus;
     });
 
     socket.on('chat:message', (msg) => {

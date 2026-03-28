@@ -80,7 +80,7 @@ function MessageBubble({ msg, myUsername }) {
   if (isNews) {
     return (
       <div style={styles.newsMsg}>
-        <div style={styles.newsHeader}>📰 BREAKING NEWS</div>
+        <div style={styles.newsHeader}>📰 MORNING REPORT</div>
         <p style={styles.newsText}>{msg.text}</p>
       </div>
     );
@@ -149,24 +149,28 @@ const styles = {
     borderRadius: '10px',
   },
   newsMsg: {
-    background: 'rgba(212,160,23,0.08)',
-    border: '1px solid rgba(212,160,23,0.25)',
+    background: 'rgba(10,8,6,0.78)',
+    border: '1px solid rgba(180,120,10,0.28)',
+    borderLeft: '3px solid rgba(200,140,10,0.55)',
     borderRadius: 'var(--radius)',
     padding: '0.625rem 0.875rem',
     margin: '0.25rem 0',
-    opacity: 0.8,
+    backdropFilter: 'blur(4px)',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.45)',
   },
   newsHeader: {
     fontFamily: 'var(--font-display)',
-    fontSize: '0.7rem',
-    letterSpacing: '0.12em',
-    color: 'var(--gold)',
-    marginBottom: '0.25rem',
+    fontSize: '0.65rem',
+    letterSpacing: '0.14em',
+    color: 'rgba(180,130,10,0.75)',
+    marginBottom: '0.3rem',
+    textTransform: 'uppercase',
   },
   newsText: {
-    fontSize: '0.9rem',
-    color: 'var(--text-primary)',
-    lineHeight: 1.5,
+    fontSize: '0.88rem',
+    color: 'rgba(220,210,190,0.72)',
+    lineHeight: 1.55,
+    fontStyle: 'italic',
   },
   chatMsg: {
     padding: '0.375rem 0.625rem',
