@@ -4,8 +4,8 @@ import { useRef, useEffect, useCallback } from 'react';
  * useGameAudio — manages all Mafia08 in-game sounds.
  *
  * Sound files expected in /public/sounds/:
- *   night-music.mp3  — ambient loop during night phase
- *   morning-bell.mp3 — one-shot bell when day starts (auto-stops after 3s)
+ *   night-music.wav  — ambient loop during night phase
+ *   morning-bell.wav — one-shot bell when day starts (auto-stops after 3s)
  *   kill-sound.mp3   — gunshot for each kill revealed in morning narration
  */
 export function useGameAudio() {
@@ -16,7 +16,7 @@ export function useGameAudio() {
   // Lazily create audio objects (avoids SSR / pre-mount issues)
   const getAudio = (ref, src) => {
     if (!ref.current) {
-      const a = new Audio(src);
+      const a = new Audio(src); // WAV and MP3 both supported natively in browsers
       a.preload = 'auto';
       ref.current = a;
     }
@@ -25,7 +25,7 @@ export function useGameAudio() {
 
   // --- Night Music ---
   const playNightMusic = useCallback(() => {
-    const audio = getAudio(nightMusicRef, '/sounds/night-music.mp3');
+    const audio = getAudio(nightMusicRef, '/sounds/night-music.wav');
     audio.loop = true;
     audio.volume = 0.22;  // soft background
     audio.currentTime = 0;
@@ -53,7 +53,7 @@ export function useGameAudio() {
 
   // --- Morning Bell ---
   const playMorningBell = useCallback(() => {
-    const audio = getAudio(morningBellRef, '/sounds/morning-bell.mp3');
+    const audio = getAudio(morningBellRef, '/sounds/morning-bell.wav');
     audio.loop = false;
     audio.volume = 0.7;
     audio.currentTime = 0;
