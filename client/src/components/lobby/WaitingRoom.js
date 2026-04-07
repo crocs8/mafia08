@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { MIN_PLAYERS } from '../../assets/roleInfo';
 
-export default function WaitingRoom({ room, myUserId, onStart, onLeave }) {
+export default function WaitingRoom({ room, myUserId, onStart, onLeave, onKick, onClose }) {
   const isHost = room.players.find(p => p.userId === myUserId)?.isHost;
   const min = MIN_PLAYERS[room.maxPlayers];
   const canStart = room.players.length >= min;
@@ -58,6 +58,15 @@ export default function WaitingRoom({ room, myUserId, onStart, onLeave }) {
                 <span style={{ width:6, height:6, borderRadius:'50%', background:'#22c55e' }} />
                 {p.username}
                 {p.isHost && <span style={styles.hostTag}>HOST</span>}
+                {isHost && p.userId !== myUserId && (
+                  <button 
+                    style={styles.kickBtn} 
+                    onClick={() => onKick(p.userId)}
+                    title="Kick player"
+                  >
+                    ×
+                  </button>
+                )}
               </motion.div>
             ))}
             {/* Empty slots */}
@@ -72,19 +81,27 @@ export default function WaitingRoom({ room, myUserId, onStart, onLeave }) {
         {/* Actions */}
         <div style={styles.actions}>
           {isHost ? (
-            <button
-              style={{ ...styles.btnStart, opacity: canStart ? 1 : 0.4 }}
-              onClick={onStart}
-              disabled={!canStart}
-            >
-              {canStart ? 'START GAME' : `WAITING FOR PLAYERS (${room.players.length}/${min})`}
-            </button>
+            <>
+              <button
+                style={{ ...styles.btnStart, opacity: canStart ? 1 : 0.4 }}
+                onClick={onStart}
+                disabled={!canStart}
+              >
+                {canStart ? 'START GAME' : `WAITING FOR PLAYERS (${room.players.length}/${min})`}
+              </button>
+              <div style={styles.hostActions}>
+                <button style={{ ...styles.btnLeave, flex: 1 }} onClick={onLeave}>Leave Room</button>
+                <button style={{ ...styles.btnClose, flex: 1 }} onClick={onClose}>Close Room</button>
+              </div>
+            </>
           ) : (
-            <div style={styles.waitMsg}>
-              <span style={{ fontSize:'0.8rem', color:'var(--text-muted)', fontStyle:'italic' }}>Waiting for host to start...</span>
-            </div>
+            <>
+              <div style={styles.waitMsg}>
+                <span style={{ fontSize:'0.8rem', color:'var(--text-muted)', fontStyle:'italic' }}>Waiting for host to start...</span>
+              </div>
+              <button style={styles.btnLeave} onClick={onLeave}>Leave Room</button>
+            </>
           )}
-          <button style={styles.btnLeave} onClick={onLeave}>Leave Room</button>
         </div>
       </motion.div>
     </div>
@@ -106,8 +123,11 @@ const styles = {
   playerChip: { display:'flex', alignItems:'center', gap:'0.5rem', border:'1px solid', borderRadius:'var(--radius)', padding:'0.375rem 0.625rem', fontSize:'0.875rem', background:'var(--bg-card2)' },
   emptySlot: { border:'1px dashed var(--border)', borderRadius:'var(--radius)', padding:'0.375rem 0.625rem', fontSize:'0.75rem', color:'var(--text-muted)', display:'flex', alignItems:'center', fontStyle:'italic' },
   hostTag: { fontFamily:'var(--font-display)', fontSize:'0.55rem', letterSpacing:'0.1em', color:'var(--gold)', border:'1px solid var(--gold-dim)', padding:'1px 4px', borderRadius:'2px', marginLeft:'auto' },
+  kickBtn: { background:'none', border:'none', color:'var(--red)', fontSize:'1.2rem', cursor:'pointer', padding:'0 0.2rem', marginLeft:'auto', lineHeight:1, display:'flex', alignItems:'center' },
   actions: { display:'flex', flexDirection:'column', gap:'0.5rem' },
+  hostActions: { display: 'flex', gap: '0.5rem', width: '100%' },
   btnStart: { background:'var(--red)', color:'#fff', fontFamily:'var(--font-display)', fontSize:'1rem', letterSpacing:'0.1em', padding:'0.875rem', borderRadius:'var(--radius)', border:'none', cursor:'pointer', transition:'opacity 0.2s' },
   waitMsg: { textAlign:'center', padding:'0.875rem' },
   btnLeave: { background:'none', color:'var(--text-muted)', fontFamily:'var(--font-body)', fontSize:'0.875rem', padding:'0.5rem', borderRadius:'var(--radius)', border:'1px solid var(--border)', cursor:'pointer' },
+  btnClose: { background:'rgba(220,38,38,0.1)', color:'var(--red)', fontFamily:'var(--font-body)', fontSize:'0.875rem', padding:'0.5rem', borderRadius:'var(--radius)', border:'1px solid var(--red-dim)', cursor:'pointer' },
 };

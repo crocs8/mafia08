@@ -462,17 +462,70 @@ function registerSocketHandlers(io) {
         if (room.status === 'waiting') {
           room.players.splice(idx, 1);
           systemMsg(room, `${player.username} left the room.`);
-          if (room.players.length === 0) {
-            await Room.deleteOne({ code: room.code });
-            return;
-          }
-          // Transfer host if needed
-          if (player.isHost && room.players.length > 0) {
-            room.players[0].isHost = true;
-          }
+        } else {
+          // If the game started, mark as dead but don't break arrays
+          player.isAlive = false;
+          player.socketId = null;
+          systemMsg(room, `${player.username} abandoned the game.`);
         }
 
         socket.leave(roomCode.toUpperCase());
+        
+        // Remove room if completely empty in waiting, or if NO ONE has a socketId
+        const anyActive = room.players.some(p => p.socketId && p.userId !== socket.userId);
+        if (room.players.length === 0 || (!anyActive && room.status !== 'waiting')) {
+          await Room.deleteOne({ code: room.code });
+          return;
+        }
+
+        // Transfer host if needed (in waiting phase)
+        if (room.status === 'waiting' && player.isHost && room.players.length > 0) {
+          room.players[0].isHost = true;
+        }
+
+        await room.save();
+        broadcastRoom(io, room);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+
+    // Close room (Host only)
+    socket.on('room:close', async ({ roomCode }) => {
+      try {
+        const room = await Room.findOne({ code: roomCode.toUpperCase() });
+        if (!room) return;
+
+        const host = room.players.find(p => p.userId === socket.userId);
+        if (!host?.isHost) return socket.emit('error', 'Only host can close the room');
+
+        await Room.deleteOne({ code: room.code });
+        io.to(roomCode.toUpperCase()).emit('room:closed');
+      } catch (e) {
+        console.error(e);
+      }
+    });
+
+    // Kick player (Host only)
+    socket.on('room:kick', async ({ roomCode, targetId }) => {
+      try {
+        const room = await Room.findOne({ code: roomCode.toUpperCase() });
+        if (!room || room.status !== 'waiting') return socket.emit('error', 'Can only kick in waiting area');
+
+        const host = room.players.find(p => p.userId === socket.userId);
+        if (!host?.isHost) return socket.emit('error', 'Only host can kick');
+
+        const targetIdx = room.players.findIndex(p => p.userId === targetId);
+        if (targetIdx === -1) return socket.emit('error', 'Player not found');
+
+        const targetPlayer = room.players[targetIdx];
+        room.players.splice(targetIdx, 1);
+        systemMsg(room, `${targetPlayer.username} was kicked by the host.`);
+
+        if (targetPlayer.socketId) {
+          io.to(targetPlayer.socketId).emit('room:kicked');
+        }
+
         await room.save();
         broadcastRoom(io, room);
       } catch (e) {
@@ -482,6 +535,37 @@ function registerSocketHandlers(io) {
 
     socket.on('disconnect', async () => {
       console.log(`Disconnected: ${socket.username}`);
+      try {
+        // Find rooms where this user is present
+        const rooms = await Room.find({ 'players.userId': socket.userId });
+        for (let room of rooms) {
+          const player = room.players.find(x => x.userId === socket.userId);
+          if (player) player.socketId = null;
+
+          const anyActive = room.players.some(x => x.socketId != null);
+          if (!anyActive) {
+            // Room abandoned
+            await Room.deleteOne({ _id: room._id });
+          } else {
+            // Remove user completely if in waiting room to free up slot
+            if (room.status === 'waiting') {
+              const idx = room.players.findIndex(p => p.userId === socket.userId);
+              if (idx !== -1) {
+                const p = room.players[idx];
+                room.players.splice(idx, 1);
+                systemMsg(room, `${p.username} disconnected.`);
+                if (p.isHost && room.players.length > 0) {
+                  room.players[0].isHost = true; // Transfer host
+                }
+              }
+            }
+            await room.save();
+            broadcastRoom(io, room);
+          }
+        }
+      } catch (e) {
+        console.error('Error handling disconnect cleanup:', e);
+      }
     });
   });
 }

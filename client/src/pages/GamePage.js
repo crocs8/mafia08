@@ -124,6 +124,16 @@ export default function GamePage() {
       setTimeout(() => setError(''), 3000);
     });
 
+    socket.on('room:kicked', () => {
+      alert('You have been kicked from the room by the host.');
+      navigate('/lobby');
+    });
+
+    socket.on('room:closed', () => {
+      alert('The room was closed by the host.');
+      navigate('/lobby');
+    });
+
     // After listeners are set up, reconcile room membership.
     // room:reconnect updates our socketId and puts us in the socket room (if already a member).
     // room:join is then called to handle the case where we are new OR to ensure
@@ -171,6 +181,8 @@ export default function GamePage() {
         socket.off('vote:update');
         socket.off('night:action:confirm');
         socket.off('error');
+        socket.off('room:kicked');
+        socket.off('room:closed');
       }
     };
   }, [code]);
@@ -184,6 +196,16 @@ export default function GamePage() {
     const socket = getSocket();
     socket?.emit('room:leave', { roomCode: code });
     navigate('/lobby');
+  };
+
+  const handleClose = () => {
+    const socket = getSocket();
+    socket?.emit('room:close', { roomCode: code });
+  };
+
+  const handleKick = (targetId) => {
+    const socket = getSocket();
+    socket?.emit('room:kick', { roomCode: code, targetId });
   };
 
   const handleChat = (text) => {
@@ -217,7 +239,14 @@ export default function GamePage() {
   if (room.status === 'waiting') {
     return (
       <>
-        <WaitingRoom room={room} myUserId={user?.userId} onStart={handleStart} onLeave={handleLeave} />
+        <WaitingRoom 
+          room={room} 
+          myUserId={user?.userId} 
+          onStart={handleStart} 
+          onLeave={handleLeave} 
+          onClose={handleClose} 
+          onKick={handleKick} 
+        />
       </>
     );
   }
